@@ -84,9 +84,36 @@ data.met <- data.met %>%
                        WS_ver = WS,
                        NO2_ver = no2)
 
-data <- left_join(data,
-                  data.met[, c("date_ver", "time_start", "time_end", "PM25_wanliu_ver", "TEMP_ver", "RH_ver", "BP_ver", "WD_ver", "WS_ver", "NO2_ver")],
-                  by = c("date_ver", "time_start", "time_end"))
+data <- data %>%
+            left_join(data.met[, c("date_ver", "time_start", "time_end", "PM25_wanliu_ver", "TEMP_ver", "RH_ver", "BP_ver", "WD_ver", "WS_ver", "NO2_ver")],
+                      by = c("date_ver", "time_start", "time_end"))
+
+data_na <- data %>%
+               filter(is.na(PM25_wanliu_ver) == TRUE | is.na(TEMP_ver) == TRUE | is.na(RH_ver) == TRUE | is.na(BP_ver) == TRUE |
+                      is.na(WD_ver) == TRUE | is.na(WS_ver) == TRUE | is.na(NO2_ver) == TRUE) %>%
+                   right_join(data.met, by = c("date_ver", "time_start", "time_end")) %>%
+                       arrange(date, time) %>%
+                           mutate(time_point0 = time_point1 - 60,
+                                  time_point4 = time_point3 + 60) %>%
+                               mutate(time_start = case_when(is.na(start_min) == FALSE & mid_min < time_point2 & (time_point3 - end_min) < (start_min - time_point0) ~ time_point2,
+                                                             is.na(start_min) == FALSE & mid_min < time_point2 & (time_point3 - end_min) >= (start_min - time_point0) ~ time_point0,
+                                                             is.na(start_min) == FALSE & mid_min >= time_point2 & (time_point4 - end_min) < (start_min - time_point1) ~ time_point3,
+                                                             is.na(start_min) == FALSE & mid_min >= time_point2 & (time_point4 - end_min) >= (start_min - time_point1) ~ time_point1,
+                                                             TRUE ~ time_start),
+                                      time_end = case_when(is.na(start_min) == FALSE & mid_min < time_point2 & (time_point3 - end_min) < (start_min - time_point0) ~ time_point2 + 60,
+                                                           is.na(start_min) == FALSE & mid_min < time_point2 & (time_point3 - end_min) >= (start_min - time_point0) ~ time_point0 + 60,
+                                                           is.na(start_min) == FALSE & mid_min >= time_point2 & (time_point4 - end_min) < (start_min - time_point1) ~ time_point3 + 60,
+                                                           is.na(start_min) == FALSE & mid_min >= time_point2 & (time_point4 - end_min) >= (start_min - time_point1) ~ time_point1 + 60,
+                                                           TRUE ~ time_end)) %>%
+                                          select(colnames(data)) %>%
+                                              right_join(data.met, by = c("date_ver", "time_start", "time_end")) %>%
+                                                  filter(is.na(start_min) == FALSE) %>%
+                                                      select(colnames(data), time_start, time_end, PM25_wanliu_ver, TEMP_ver, RH_ver, BP_ver, WD_ver, WS_ver, NO2_ver)
+
+data <- data %>%
+            filter(is.na(PM25_wanliu_ver) == TRUE | is.na(TEMP_ver) == TRUE | is.na(RH_ver) == TRUE | is.na(BP_ver) == TRUE |
+                       is.na(WD_ver) == TRUE | is.na(WS_ver) == TRUE | is.na(NO2_ver) == TRUE) %>%
+                bind_rows(data_na)
 # differences
 # nrow = 16, PM25_wanliu_ver = NA --> time_start = 1080, time_end = 1140, PM25_wanliu_Ver = 19.0, correct
 # nrow = 25, NO2_ver = NA --> start_min - 1080 < 1140 - end_min --> time_start = 1020, time_end = 1080, NO2 = 39.6, correct
